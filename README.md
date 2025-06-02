@@ -1,36 +1,143 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NextAuth Setup in Next.js
 
-## Getting Started
+This guide helps you add authentication (login/signup) to your Next.js app using NextAuth with GitHub and Google providers.
 
-First, run the development server:
+### 1. Install NextAuth
+
+Run this command in your project folder:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install next-auth
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2. Configure Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create a `.env.local` file in your project root and add:
 
-## Learn More
+```
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your_secret_key_here
+GITHUB_ID=your_github_client_id
+GITHUB_SECRET=your_github_client_secret
+GOOGLE_ID=your_google_client_id
+GOOGLE_SECRET=your_google_client_secret
+```
 
-To learn more about Next.js, take a look at the following resources:
+* `NEXTAUTH_URL` is your local app URL.
+* `NEXTAUTH_SECRET` secures the session.
+* GitHub and Google IDs and secrets come from their developer consoles.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 3. Create the NextAuth API Route
 
-## Deploy on Vercel
+In your `app` folder, create:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+app/auth/[...nextauth]/route.ts
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Add this code to configure GitHub and Google login:
+
+```ts
+import NextAuth from "next-auth";
+import GithubProvider from "next-auth/providers/github";
+import GoogleProvider from "next-auth/providers/google";
+
+const handler = NextAuth({
+  providers: [
+    GithubProvider({
+      clientId: process.env.GITHUB_ID!,
+      clientSecret: process.env.GITHUB_SECRET!,
+    }),
+    GoogleProvider({
+      clientId: process.env.GOOGLE_ID!,
+      clientSecret: process.env.GOOGLE_SECRET!,
+    }),
+  ],
+  secret: process.env.NEXTAUTH_SECRET,
+});
+
+export { handler as GET, handler as POST };
+```
+
+---
+
+### 4. Create `provider.tsx`
+
+Make a file `app/auth/provider.tsx` to wrap your app with NextAuth’s session provider:
+
+```tsx
+"use client";
+
+import { SessionProvider } from "next-auth/react";
+
+export function AuthProvider({ children, session }: { children: React.ReactNode; session?: any }) {
+  return <SessionProvider session={session}>{children}</SessionProvider>;
+}
+```
+
+---
+
+### 5. Wrap Your Layout
+
+In your root layout (`app/layout.tsx`), wrap your app with `AuthProvider` so login state is accessible everywhere:
+
+```tsx
+import { AuthProvider } from "./auth/provider";
+
+export default function RootLayout({ children, session }: { children: React.ReactNode; session?: any }) {
+  return (
+    <html>
+      <body>
+        <AuthProvider session={session}>
+          {children}
+        </AuthProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+---
+
+### 6. Use Authentication State in Components
+
+In any client component, use the `useSession` hook to check if the user is logged in:
+
+```tsx
+"use client";
+
+import { useSession, signIn, signOut } from "next-auth/react";
+
+export default function LoginStatus() {
+  const { data: session } = useSession();
+
+  if (session) {
+    return (
+      <>
+        <p>Welcome, {session.user?.name}</p>
+        <button onClick={() => signOut()}>Sign out</button>
+      </>
+    );
+  }
+
+  return <button onClick={() => signIn()}>Sign in</button>;
+}
+```
+
+---
+
+# Summary
+
+* Install NextAuth.
+* Set secrets and API keys in `.env.local`.
+* Create API route for NextAuth config.
+* Wrap app with session provider using a custom `AuthProvider`.
+* Use `useSession` to manage user login status in UI.
+
+This setup allows users to log in using GitHub or Google in your Next.js app easily.
+
+---
